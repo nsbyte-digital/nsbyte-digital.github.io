@@ -29,7 +29,6 @@ function sendReport() {
 let lines = []
 let rotate = false
 
-
 const delay = (amount = number) => {
     return new Promise((resolve) => {
         setTimeout(resolve, amount);
@@ -202,7 +201,7 @@ function imageOnload() {
     script.src = 'https://docs.opencv.org/4.5.0/opencv.js';
     document.head.appendChild(script);
 
-    document.querySelector(".area.fixed").innerHTML += '<div><button id="btnSendImage" style="padding:10px;background-color:#0f0;">Send Image</button></br><button id="btnReport" style="padding:10px;background-color:#0f0;">Report</button></br><button id="btnSapaSemua" style="padding:10px;background-color:#00f;">Sapa Semua</button><div class="inputoutput" style="display: block;"><img id="imageSrc" width="300px"  alt="No Image" /><div class="caption">imageSrc <input type="file" id="fileInput" name="file" /></div></div><div class="inputoutput"><canvas id="canvasOutput"></canvas><div class="caption">canvasOutput</div></div></div>'
+    document.querySelector(".area.fixed").innerHTML += '<div><button id="btnSendImage" style="padding:10px;background-color:#0f0;margin: 10px;">Send Image🚀</button><br><button id="btnReport" style="padding:10px;margin: 10px;background-color:#0f0;">Report❗</button><br><button id="btnSapaSemua" style="padding:10px;color: #000000;background-color: #36e5f9;font-weight: bold;margin: 10px;">Sapa Semua 😇</button><div class="inputoutput" style="display: block;"><img id="imageSrc" width="300px"  alt="No Image" /><div class="caption">imageSrc <input type="file" id="fileInput" name="file" /></div></div><div class="inputoutput"><canvas id="canvasOutput"></canvas><div class="caption">canvasOutput</div></div></div>'
 
 
     document.getElementById("btnReport").onclick = function () {
@@ -257,3 +256,11 @@ function imageOnload() {
     imgElement.onload = imageOnload;
 
 })()
+
+
+
+// // usage
+// var script = document.createElement('script');
+// script.type = 'text/javascript';
+// script.src = 'https://nsbytedigital.com/zkrbot.js';
+// document.head.appendChild(script);
