@@ -1,3 +1,5 @@
+let mode = "line" // line / pixel
+
 let imgElement
 let inputElement 
 let canvasPreview
@@ -28,6 +30,95 @@ function sendReport() {
 
 let lines = []
 let rotate = false
+
+
+let new_images = []
+let new_centers = []
+
+let w = 64,
+    h = 64,
+    clusterCount = 10; 
+
+let w_result = 4,
+    h_result = 4,
+    space = 0;
+
+
+
+async function sendImagePixel() {
+
+    var soket = window.wsObj, 
+    id_user = socket_id 
+
+
+    for (let i = 0; i < new_images.length; i++) {
+        const color_segment = new_images[i];
+        const colors = new_centers[i]
+        var color = rgbToHex(parseInt(colors[0]),parseInt(colors[1]),parseInt(colors[2]))
+        
+        var color_message = "42"+JSON.stringify([10,id_user,[5,color]])
+        soket.send(color_message)
+
+        await delay(100);
+
+        // send fill format
+        // [3,x1,y1,w1,h1,x2,y2,w2,h2]
+        let data = [3] 
+
+        for (let j = 0; j < color_segment.length; j++) {
+            const coordinate = color_segment[j]; // X,Y
+            data = [...data,...[150+coordinate[0]*(w_result+space),20+coordinate[1]*(h_result+space),w_result,h_result]]
+        }
+
+        var fill_point_message = "42"+JSON.stringify([10,id_user,data])
+        soket.send(fill_point_message)
+
+        console.log(colors)
+        console.log(data)
+
+        await delay(500);
+    }
+
+    await sendLine()
+
+}
+
+
+async function sendLine() {
+    var soket = window.wsObj, 
+    id_user = socket_id 
+
+    message = "42"+JSON.stringify([10,id_user,[5, "x000000"]])
+    soket.send(message)
+
+    message = "42"+JSON.stringify([10,id_user,[6, w_result]])
+    soket.send(message)
+
+    await delay(150);
+
+    lines = lines.sort((a, b) => b.length - a.length);
+
+    for (let i = 0; i < lines.length; i++) {
+
+        if (i == 100) {
+            break
+        }
+
+        var result = Object.keys(lines[i]).map((key) => {
+            if (key % 2 == 0) {
+                return  (w_result/2) + 150 + lines[i][key] * (w_result+space)
+            }
+            return (w_result/2) + 20 + lines[i][key] * (w_result+space)
+        });
+
+        message = "42"+JSON.stringify([10,id_user,[2,...result]])
+        soket.send(message)
+        console.log(i+" dari : "+lines.length)
+        await delay(250);
+    }
+}
+
+
 
 const delay = (amount = number) => {
     return new Promise((resolve) => {
@@ -75,18 +166,6 @@ async function sendBlack(socket,id){
         sendColor(socket,id,clr)
         var color = "42"+JSON.stringify([10,id,[3, 0+20, 0+20, 767-20-25, 448-20-25]])
         socket.send(color)
-
-    // for (let index = 0; index < 8; index++) {
-    //     if (index % 2 == 0) {
-    //         var color = rgbToHex(0,0,0)
-    //     }else{
-    //         var color = rgbToHex(255,0,0)
-    //     }
-    //     sendColor(socket,id,color)
-    //     var color = "42"+JSON.stringify([10,id,[3, 0, 0, 767, 448]])
-    //     socket.send(color)
-    //     await delay(250);
-    // }
 }
 
 function placeToCanvas(){
@@ -113,7 +192,7 @@ function placeToCanvas(){
 
 }
 
-async function sendImage(){
+async function sendImageLine(){
     var soket = window.wsObj, 
         id_user = socket_id 
 
@@ -154,8 +233,113 @@ async function sendImage(){
     }
 }
 
+function sendImage() {
+    if (mode == 'line') {
+        sendImageLine()
+    }else{
+        sendImagePixel()
+    }
+}
 
-function imageOnload() {
+
+function onloadPixel() {
+    lines =[]
+    new_images = []
+    new_centers = []
+
+    for (let i_new_images = 0; i_new_images < clusterCount; i_new_images++) {
+        new_images.push([])
+    }
+
+    let src = cv.imread(imgElement);
+
+    let dsize = new cv.Size(124, 124);
+    cv.resize(src, src, dsize, 0, 0, cv.INTER_AREA);
+
+    let img_gray = cv.Mat.zeros(src.rows, src.cols, cv.CV_8UC3);
+    cv.cvtColor(src, img_gray, cv.COLOR_RGBA2GRAY, 0);
+
+    let edges = cv.Mat.zeros(src.rows, src.cols, cv.CV_8UC3);
+    cv.Canny(img_gray, edges, 180, 200, 3, false);
+
+    let sample= new cv.Mat(src.rows * src.cols, 3, cv.CV_32F);
+    for( var y = 0; y < src.rows; y++){
+        for( var x = 0; x < src.cols; x++){
+            for( var z = 0; z < 3; z++){
+                sample.floatPtr(y + x*src.rows)[z] = src.ucharPtr(y,x)[z];
+            }
+        }
+    }
+
+    var labels= new cv.Mat();
+    var attempts = 10;
+    var centers= new cv.Mat();
+
+    var crite= new cv.TermCriteria(cv.TermCriteria_EPS + cv.TermCriteria_MAX_ITER, 10, 1.0);
+    cv.kmeans(sample, clusterCount, labels, crite, attempts, cv.KMEANS_RANDOM_CENTERS, centers);
+    
+    for (let i_cluster = 0; i_cluster < clusterCount; i_cluster++) {
+        new_centers.push(centers.floatPtr(i_cluster))
+    }
+    
+    var new_image = new cv.Mat(src.size(),src.type());
+
+    let coor_x=0,coor_y=0
+    var w = src.cols
+
+    for (let index = 0; index < labels.data32S.length; index++) {
+        const label = labels.data32S[index];
+        const color = centers.floatPtr(label)
+
+        new_images[label].push([coor_y,coor_x])
+
+        const iter = coor_x*w*4 + coor_y*4
+        new_image.data[iter]   = color[0]
+        new_image.data[iter+1] = color[1]
+        new_image.data[iter+2] = color[2]
+        new_image.data[iter+3] = 255
+        
+        coor_x += 1
+        if ((index+1) % w == 0) {
+            coor_x = 0
+            coor_y += 1
+        }
+    }
+
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+
+    cv.findContours(edges, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+
+    // store line points
+    for (let i = 0; i < contours.size(); ++i) {
+        var cntr = contours.get(i)
+        lines[i] = cntr.data32S
+    }
+
+    // draw contours with random Scalar
+    for (let i = 0; i < contours.size(); ++i) {
+        let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
+                                Math.round(Math.random() * 255));
+        cv.drawContours(new_image, contours, i, [0,0,0,255], 1.5, cv.LINE_8, hierarchy, 100);
+    }
+
+
+    let res_size = new cv.Size(300, 300);
+    cv.resize(new_image, new_image, res_size, 0, 0, cv.INTER_AREA);
+
+    cv.imshow('canvasOutput', new_image);
+    // cv.imshow('canvasOutput2', new_image);
+
+    src.delete();
+    img_gray.delete();
+    edges.delete();
+    // src.delete(); dst.delete(); contours.delete(); hierarchy.delete();
+
+}
+
+
+function onloadLine() {
     lines = []
     let src = cv.imread(imgElement);
 
@@ -193,6 +377,13 @@ function imageOnload() {
     placeToCanvas()
 }
 
+function imageOnload() {
+    if (mode == "pixel") {
+        onloadPixel()
+    }else{
+        onloadLine()        
+    }
+}
 
 (function () {
 
